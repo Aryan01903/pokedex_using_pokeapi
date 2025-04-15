@@ -5,7 +5,6 @@ import PokemonList from '../PokemonList/PokemonList';
 function Pokedex(){
     return(
         <div className="pokedex-wrapper">
-            <Search/>
             <PokemonList/>
         </div>
     )
