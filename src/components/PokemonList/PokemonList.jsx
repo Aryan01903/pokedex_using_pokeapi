@@ -8,7 +8,7 @@ function PokemonList() {
     const [pokemonListState, setPokemonListState] = useState({
         pokemonList: [],
         isLoading: true,
-        pokedexUrl: "https://pokeapi.co/api/v2/pokemon",
+        pokedexUrl: "https://pokeapi.co/api/v2/pokemon?limit=150",
         nextUrl: "",
         prevUrl: ""
     });
@@ -63,7 +63,8 @@ function PokemonList() {
         setIsSearching(true);
 
         try {
-            const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${searchTerm}`);
+            // First try searching by Pokémon name
+            const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${searchTerm.toLowerCase()}`);
             const pokemon = response.data;
             const searchResult = [{
                 id: pokemon.id,
@@ -77,12 +78,40 @@ function PokemonList() {
                 isLoading: false
             }));
         } catch (error) {
-            alert("Pokémon not found!");
-            setPokemonListState((state) => ({
-                ...state,
-                pokemonList: [],
-                isLoading: false
-            }));
+            // If not found, try searching by type
+            try {
+                const typeResponse = await axios.get(`https://pokeapi.co/api/v2/type/${searchTerm.toLowerCase()}`);
+                const pokemonOfType = typeResponse.data.pokemon;
+
+                const limitedPokemon = pokemonOfType.slice(0, 20); // Limit to 20 for performance
+                const pokemonDetailRequests = limitedPokemon.map(p =>
+                    axios.get(p.pokemon.url)
+                );
+
+                const pokemonDetails = await axios.all(pokemonDetailRequests);
+                const searchResult = pokemonDetails.map((pokeData) => {
+                    const pokemon = pokeData.data;
+                    return {
+                        id: pokemon.id,
+                        name: pokemon.name,
+                        image: pokemon.sprites.other.dream_world.front_default,
+                        types: pokemon.types
+                    };
+                });
+
+                setPokemonListState((state) => ({
+                    ...state,
+                    pokemonList: searchResult,
+                    isLoading: false
+                }));
+            } catch (typeError) {
+                alert("Pokémon or type not found!");
+                setPokemonListState((state) => ({
+                    ...state,
+                    pokemonList: [],
+                    isLoading: false
+                }));
+            }
         }
     }
 
@@ -110,7 +139,7 @@ function PokemonList() {
 
             <div className="pokemon-wrapper">
                 {pokemonListState.isLoading
-                    ? "Loading..."
+                    ? <p>Loading...</p>
                     : pokemonListState.pokemonList.map((p) => (
                         <Pokemon name={p.name} image={p.image} key={p.id} id={p.id} />
                     ))}
